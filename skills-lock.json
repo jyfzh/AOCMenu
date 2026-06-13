@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "skills": {
+    "frontend-design-review": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/frontend-design-review/SKILL.md",
+      "computedHash": "ab7eeeef16d3583172fe0a91a42b85c79cd5e29f79e027dbaa886fce5087e055"
+    },
+    "microsoft-docs": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/microsoft-docs/SKILL.md",
+      "computedHash": "4f74ef0fb7127b151a00eee34cf7484414ea85965a2e7681b5775e9ee9484b37"
+    },
+    "winui-code-review": {
+      "source": "microsoft/win-dev-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/winui/skills/winui-code-review/SKILL.md",
+      "computedHash": "f6cd50b7a14674d61a320f5817a15cb67ee094e7b18987359587f04f980e4642"
+    },
+    "winui-design": {
+      "source": "microsoft/win-dev-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/winui/skills/winui-design/SKILL.md",
+      "computedHash": "928de6cc75009daa06b2033e341e87ee0e23f68187a57bdb4b7963b751bea039"
+    },
+    "winui-dev-workflow": {
+      "source": "microsoft/win-dev-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/winui/skills/winui-dev-workflow/SKILL.md",
+      "computedHash": "3a398d650984a997b24f4fef59dd2f1c585a96d22323263d3301753fabfe6b5a"
+    },
+    "winui-packaging": {
+      "source": "microsoft/win-dev-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/winui/skills/winui-packaging/SKILL.md",
+      "computedHash": "6247565f398744b0d41d76a2185e1c2bf5af920724d9451b70b7afdc6f645111"
+    },
+    "winui-session-report": {
+      "source": "microsoft/win-dev-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/winui/skills/winui-session-report/SKILL.md",
+      "computedHash": "7a2b67121490761428268dc1c14a17cf17f0fce7985aa850ca41af8e0c96239b"
+    },
+    "winui-setup": {
+      "source": "microsoft/win-dev-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/winui/skills/winui-setup/SKILL.md",
+      "computedHash": "40b50c12a4c5f5fec3d35e40aa28e94c2b18b994afeda302d97f038297ad3b96"
+    },
+    "winui-ui-testing": {
+      "source": "microsoft/win-dev-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/winui/skills/winui-ui-testing/SKILL.md",
+      "computedHash": "2bc0c22a7a6c44c8d0fa5f73ac2d0678045a6b25ad9890e1fa71ab53a8a42ef8"
+    },
+    "winui-wpf-migration": {
+      "source": "microsoft/win-dev-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/winui/skills/winui-wpf-migration/SKILL.md",
+      "computedHash": "a47a8ac087638c92d4cf4836878d331279f30148b5fbd41d5940ea6367782fc2"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AOC/AOC.csproj" />
+    <Project Path="src/ZeasnProxy/ZeasnProxy.csproj" />
+    <Project Path="src/AOC.Core/AOC.Core.csproj" />
+    <Project Path="src/AOC.UI/AOC.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/aoc.Tests/aoc.Tests.csproj" />
+  </Folder>
+</Solution>

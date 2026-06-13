@@ -1,0 +1,75 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [master, main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup WinApp CLI
+        uses: microsoft/setup-WinAppCli@v0.1
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      # ZeasnProxy needs x86 (32-bit) for Zeasn SDK reflection
+      - name: Build ZeasnProxy (x86)
+        run: dotnet build src/ZeasnProxy/ZeasnProxy.csproj -c Release --no-restore
+
+      # AOC CLI — x64
+      - name: Build AOC CLI (x64)
+        run: dotnet build src/AOC/AOC.csproj -c Release --no-restore
+
+      # WinUI GUI — x64 with MSIX
+      - name: Build AOC.UI (x64)
+        run: dotnet build src/AOC.UI/AOC.UI.csproj -c Release -p:Platform=x64 --no-restore
+
+      - name: Run Tests
+        run: dotnet test tests/aoc.Tests/aoc.Tests.csproj -c Release --no-restore --logger trx
+
+      - name: Generate Certificate & Package MSIX
+        run: |
+          winapp cert generate --manifest ./src/AOC.UI/Package.appxmanifest --if-exists skip --quiet
+          winapp package ./src/AOC.UI/bin/x64/Release/net10.0-windows10.0.26100.0/win-x64/ --cert ./devcert.pfx --self-contained --quiet
+
+      - name: Pack CLI binaries
+        shell: pwsh
+        run: |
+          Compress-Archive -Path src/AOC/bin/Release/net10.0/* -DestinationPath aoc-cli-x64.zip
+
+      - name: Upload MSIX Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AOC.UI-x64
+          path: "*.msix"
+
+      - name: Upload CLI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aoc-cli-x64
+          path: "aoc-cli-x64.zip"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.msix
+            aoc-cli-x64.zip
+          generate_release_notes: true

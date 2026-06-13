@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "AOC.UI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "AOC.UI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

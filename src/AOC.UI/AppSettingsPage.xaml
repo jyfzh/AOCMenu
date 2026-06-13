@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="aoc.UI.AppSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:conv="using:aoc.UI.Converters"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <conv:InverseBoolConverter x:Key="InverseBoolConverter" />
+    </Page.Resources>
+
+    <Grid Padding="24,8,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Page header with back button -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+            <Button
+                x:Name="BackButton"
+                Click="OnBackClick"
+                Style="{StaticResource SubtleButtonStyle}"
+                Padding="8,4"
+                Margin="0,0,8,0"
+                AutomationProperties.Name="返回主页面">
+                <FontIcon Glyph="&#xE72B;" FontSize="16" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+            </Button>
+            <TextBlock
+                Text="应用设置"
+                Style="{StaticResource TitleLargeTextBlockStyle}"
+                VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- ── Connection info card ── -->
+        <controls:SettingsCard
+            Grid.Row="1"
+            Header="代理连接"
+            Description="与 ZeasnProxy 后台服务的连接状态"
+            Margin="0,0,0,2">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                <Ellipse
+                    Width="10" Height="10"
+                    Fill="{x:Bind ConnectionColor, Mode=OneWay}"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    Text="{x:Bind ConnectionStatus, Mode=OneWay}"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    VerticalAlignment="Center" />
+            </StackPanel>
+        </controls:SettingsCard>
+
+        <!-- Pipe name info -->
+        <controls:SettingsCard
+            Grid.Row="2"
+            Header="管道名称"
+            Description="命名管道通讯标识"
+            Margin="0,0,0,2">
+            <TextBlock
+                Text="{x:Bind PipeName, Mode=OneWay}"
+                Style="{StaticResource BodyTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                HorizontalAlignment="Right" />
+        </controls:SettingsCard>
+
+        <!-- ═══════════════════════════════════════════════
+             Theme section
+             ═══════════════════════════════════════════════ -->
+
+        <!-- Theme toggle -->
+        <controls:SettingsCard
+            Grid.Row="3"
+            Header="主题"
+            Description="选择应用外观，颜色变化会从切换处扩散"
+            Margin="0,0,0,2">
+            <ComboBox x:Name="ThemeCombo"
+                      SelectedIndex="{x:Bind ThemeIndex, Mode=OneWay}"
+                      SelectionChanged="OnThemeSelectionChanged"
+                      MinWidth="120"
+                      HorizontalAlignment="Right">
+                <x:String>跟随系统</x:String>
+                <x:String>浅色</x:String>
+                <x:String>深色</x:String>
+            </ComboBox>
+        </controls:SettingsCard>
+
+        <!-- ═══════════════════════════════════════════════
+             Monitor info section
+             ═══════════════════════════════════════════════ -->
+
+        <!-- Monitor info summary card -->
+        <controls:SettingsCard
+            Grid.Row="4"
+            Header="{x:Bind MonitorDisplayName, Mode=OneWay}"
+            Description="{x:Bind MonitorSummary, Mode=OneWay}"
+            Visibility="{x:Bind HasMonitorInfo, Mode=OneWay}"
+            Margin="0,0,0,2">
+            <Button
+                Content="刷新"
+                Click="OnRefreshMonitorInfoClick"
+                Style="{StaticResource SubtleButtonStyle}"
+                Padding="12,4"
+                IsEnabled="{x:Bind IsMonitorLoading, Converter={StaticResource InverseBoolConverter}, Mode=OneWay}" />
+        </controls:SettingsCard>
+
+        <!-- Monitor detailed data (monospace raw dump) -->
+        <Border
+            Grid.Row="5"
+            Visibility="{x:Bind HasMonitorInfo, Mode=OneWay}"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="16"
+            Margin="0,0,0,16">
+            <ScrollViewer
+                MaxHeight="360"
+                VerticalScrollBarVisibility="Auto">
+                <TextBlock
+                    Text="{x:Bind MonitorDetailsText, Mode=OneWay}"
+                    FontFamily="Consolas"
+                    FontSize="12"
+                    IsTextSelectionEnabled="True"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </ScrollViewer>
+        </Border>
+
+        <!-- Loading state for monitor info -->
+        <StackPanel
+            Grid.Row="4" Grid.RowSpan="2"
+            Visibility="{x:Bind IsMonitorLoading, Mode=OneWay}"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Margin="0,24,0,24">
+            <ProgressRing
+                IsActive="True"
+                Width="24" Height="24" />
+        </StackPanel>
+
+        <!-- Error state for monitor info -->
+        <StackPanel
+            Grid.Row="4" Grid.RowSpan="2"
+            Visibility="{x:Bind HasMonitorError, Mode=OneWay}"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Margin="0,24,0,24">
+            <TextBlock
+                Text="{x:Bind MonitorErrorMessage, Mode=OneWay}"
+                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <!-- ── About card ── -->
+        <controls:SettingsCard
+            Grid.Row="6"
+            Header="关于"
+            Description="AOC.UI — AOC 显示器调节工具"
+            Margin="0,0,0,2"
+            VerticalAlignment="Top">
+            <StackPanel HorizontalAlignment="Right" Spacing="4">
+                <TextBlock
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    Text="{x:Bind AppVersion, Mode=OneWay}"
+                    HorizontalAlignment="Right" />
+            </StackPanel>
+        </controls:SettingsCard>
+    </Grid>
+</Page>
