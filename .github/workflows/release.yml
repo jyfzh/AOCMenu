@@ -2,11 +2,8 @@ name: Build and Release
 
 on:
   push:
-    branches: [master, main]
     tags:
       - 'v*'
-  pull_request:
-    branches: [master, main]
   workflow_dispatch:
 
 jobs:
@@ -26,7 +23,7 @@ jobs:
         uses: microsoft/setup-WinAppCli@v0.1
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore -p:RuntimeIdentifier=win-x64
 
       # ZeasnProxy needs x86 (32-bit) for Zeasn SDK reflection
       - name: Build ZeasnProxy (x86)
