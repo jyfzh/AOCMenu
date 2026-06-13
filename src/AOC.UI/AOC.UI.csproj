@@ -6,8 +6,10 @@
     <AssemblyName>AOC.UI</AssemblyName>
     <RootNamespace>AOC.UI</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Platforms>x86;x64;ARM64</Platforms>
-    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(Platform)' != '' And '$(Platform)' != 'AnyCPU'">win-$(Platform)</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <Platform Condition="'$(Platform)' == '' Or '$(Platform)' == 'AnyCPU'">x64</Platform>
     <PublishProfile Condition="Exists('Properties\PublishProfiles\win-$(Platform).pubxml')">win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
@@ -67,6 +69,15 @@
     <Copy SourceFiles="@(_ZeasnProxySdkFiles)" DestinationFolder="$(OutputPath)\sdk\"
           SkipUnchangedFiles="true" />
   </Target>
+
+  <!--
+    NOTE: MSIX packaging is now handled in CI via GenerateAppxPackageOnBuild.
+    See .github/workflows/release.yml for the step-by-step workflow.
+    Local dev: build + deploy with F5 in Visual Studio, or use:
+      msbuild src/AOC.UI/AOC.UI.csproj /p:Configuration=Release /p:Platform=x64
+        /p:GenerateAppxPackageOnBuild=true /p:UapAppxPackageBuildMode=SideloadOnly
+        /p:AppxBundle=Never /p:AppxPackageDir="Packages\"
+  -->
 
   <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>

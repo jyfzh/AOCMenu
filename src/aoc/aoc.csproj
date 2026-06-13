@@ -2,8 +2,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>aoc</AssemblyName>
+    <!-- SelfContained is set at publish time via CLI or CI; build is framework-dependent -->
   </PropertyGroup>
 
   <ItemGroup>

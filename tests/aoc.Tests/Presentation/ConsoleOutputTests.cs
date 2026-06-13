@@ -19,7 +19,7 @@ public class ConsoleOutputTests
         var text = CaptureStdOut(() =>
             _output.PrintHelp(SettingCatalog.All.Values.ToArray()));
 
-        text.Should().Contain("AOC OSD 控制器");
+        text.Should().Contain("aoc — USB 私有协议 OSD 设置工具");
         text.Should().Contain("--help");
     }
 
