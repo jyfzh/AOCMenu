@@ -255,7 +255,14 @@ public partial class SettingViewModel : ObservableObject
         // Pass the display key (e.g. "srgb") — SettingService.Set resolves
         // it to the SDK value via EnumMap, matching the CLI path.
         var displayKey = DisplayOptions[value];
-        _ = SetValueAsync(displayKey);
+        var task = SetValueAsync(displayKey);
+        _ = task.ContinueWith(static (t, _) =>
+        {
+            if (t.Exception is not null)
+            {
+                Debug.WriteLine($"[UI] OnSelectedIndexChanged: SetValueAsync failed: {t.Exception.InnerException?.Message}");
+            }
+        }, null, TaskContinuationOptions.OnlyOnFaulted);
     }
 
     /// <summary>
@@ -267,7 +274,14 @@ public partial class SettingViewModel : ObservableObject
     {
         if (_suppressSliderEvents) return;
         var intVal = (int)Math.Round(value);
-        _ = SetValueAsync(intVal.ToString());
+        var task = SetValueAsync(intVal.ToString());
+        _ = task.ContinueWith(static (t, _) =>
+        {
+            if (t.Exception is not null)
+            {
+                Debug.WriteLine($"[UI] OnSliderValueChanged: SetValueAsync failed: {t.Exception.InnerException?.Message}");
+            }
+        }, null, TaskContinuationOptions.OnlyOnFaulted);
     }
 
     /// <summary>
@@ -281,7 +295,14 @@ public partial class SettingViewModel : ObservableObject
         if (_def.EnumMap is null) return;
 
         var target = isOn ? "on" : "off";
-        _ = SetValueAsync(target);
+        var task = SetValueAsync(target);
+        _ = task.ContinueWith(static (t, _) =>
+        {
+            if (t.Exception is not null)
+            {
+                Debug.WriteLine($"[UI] OnToggleChanged: SetValueAsync failed: {t.Exception.InnerException?.Message}");
+            }
+        }, null, TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private void UpdateSelectedIndex(string? rawValue)

@@ -117,7 +117,15 @@ public partial class MainViewModel : ObservableObject
                 {
                     // Full refresh — reads hardware-enforced value (for readable settings)
                     // and re-checks IsEnabled (via CheckPrerequisiteAsync in finally)
-                    _ = setting.RefreshCommand.ExecuteAsync(null);
+                    // Safe fire-and-forget: RefreshAsync has comprehensive try-catch inside.
+                    var task = setting.RefreshCommand.ExecuteAsync(null);
+                    _ = task.ContinueWith(static (t, _) =>
+                    {
+                        if (t.Exception is not null)
+                        {
+                            Debug.WriteLine($"[UI] OnSettingValueChanged: refresh failed: {t.Exception.InnerException?.Message}");
+                        }
+                    }, null, TaskContinuationOptions.OnlyOnFaulted);
                 }
             }
         }
@@ -134,10 +142,32 @@ public partial class MainViewModel : ObservableObject
 
     private async Task LoadAllSettingsAsync()
     {
-        Debug.WriteLine($"[UI] LoadAllSettingsAsync: refreshing {Categories.Sum(c => c.Settings.Count)} settings...");
-        var tasks = Categories
-            .SelectMany(c => c.Settings)
-            .Select(s => s.RefreshCommand.ExecuteAsync(null));
+        var allSettings = Categories.SelectMany(c => c.Settings).ToArray();
+        Debug.WriteLine($"[UI] LoadAllSettingsAsync: refreshing {allSettings.Length} settings...");
+
+        // Use a SemaphoreSlim to limit concurrent IPC requests.
+        // Even though IPC itself serializes via _sendLock, limiting concurrency
+        // reduces task overhead and avoids thread pool starvation when loading
+        // many (50+) settings simultaneously.
+        const int maxConcurrency = 8;
+        using var throttle = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+
+        var tasks = allSettings.Select(async setting =>
+        {
+            await throttle.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await setting.RefreshCommand.ExecuteAsync(null);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[UI] LoadAllSettingsAsync: setting '{setting.DisplayName}' failed: {ex.Message}");
+            }
+            finally
+            {
+                throttle.Release();
+            }
+        });
 
         await Task.WhenAll(tasks);
         Debug.WriteLine("[UI] LoadAllSettingsAsync: completed.");

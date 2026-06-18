@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -19,6 +20,77 @@ public partial class App : Microsoft.UI.Xaml.Application
     public App()
     {
         InitializeComponent();
+
+        // ── Global exception handlers ──────────────────────────────
+        // These catch exceptions that would otherwise escape to the OS
+        // and cause an unmanaged crash (ExecutionEngineException).
+        AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        Current.UnhandledException += OnApplicationUnhandledException;
+    }
+
+    /// <summary>
+    /// Catches exceptions from non-UI threads that escape all handlers.
+    /// Logs the error and prevents a hard crash where possible.
+    /// </summary>
+    private static void OnAppDomainUnhandledException(object sender, System.UnhandledExceptionEventArgs e)
+    {
+        var ex = e.ExceptionObject as Exception;
+        var message = ex?.ToString() ?? "Unknown error";
+        Debug.WriteLine($"[FATAL] AppDomain unhandled exception (terminating={e.IsTerminating}): {message}");
+        LastChanceLog(message);
+    }
+
+    /// <summary>
+    /// Catches exceptions from fire-and-forget tasks that were thrown but
+    /// never observed. This is the last line of defense for the
+    /// _ = SetValueAsync(...) pattern in ViewModels.
+    /// </summary>
+    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        var ex = e.Exception?.InnerException ?? e.Exception;
+        var message = ex?.ToString() ?? "Unknown task error";
+        Debug.WriteLine($"[FATAL] Unobserved task exception: {message}");
+        LastChanceLog(message);
+
+        // Mark as observed to prevent the process from crashing.
+        // The exception has already been logged for diagnosis.
+        e.SetObserved();
+    }
+
+    /// <summary>
+    /// Catches exceptions from WinUI event handlers (e.g. Loaded, Click)
+    /// that would otherwise terminate the application.
+    /// </summary>
+    private static void OnApplicationUnhandledException(object? sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        var message = e.Exception?.ToString() ?? "Unknown WinUI error";
+        Debug.WriteLine($"[FATAL] WinUI unhandled exception (handled={e.Handled}): {message}");
+        LastChanceLog(message);
+
+        // Mark as handled to prevent crash — the app may still be usable.
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Writes a fatal error message to a crash log file alongside the
+    /// executable, so diagnostic information survives process termination.
+    /// </summary>
+    private static void LastChanceLog(string message)
+    {
+        try
+        {
+            var logPath = Path.Combine(
+                AppContext.BaseDirectory,
+                $"crash_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+            File.WriteAllText(logPath,
+                $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n" +
+                $"Error: {message}\r\n");
+        }
+        catch
+        {
+            // Last resort — nothing we can do.
+        }
     }
 
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
@@ -27,8 +99,16 @@ public partial class App : Microsoft.UI.Xaml.Application
 
         Window = new MainWindow();
 
-        // Apply saved theme before the window renders
-        ThemeService.Instance.Initialize();
+        // Apply saved theme before the window renders.
+        // Wrap in try-catch as a safety net: theme persistence is non-critical.
+        try
+        {
+            ThemeService.Instance.Initialize();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[App] Theme init failed (non-fatal): {ex.Message}");
+        }
 
         Window.Activate();
         SetupTrayIcon();

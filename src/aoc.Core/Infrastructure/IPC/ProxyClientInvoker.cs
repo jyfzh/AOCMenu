@@ -44,10 +44,6 @@ public sealed class ProxyClientInvoker : IAocInvoker, IAsyncDisposable
     private ArrayBufferWriter<byte>? _buffer;
     private Utf8JsonWriter? _jsonWriter;
 
-    // ── Reusable read buffers (growing, no fixed cap) ──────────────
-    private readonly MemoryStream _readStream = new(4096);
-    private readonly byte[] _readChunk = new byte[1024];
-
     // ── Sentinal empty JSON object for error paths ─────────────────
     private static readonly JsonElement s_emptyObject = JsonDocument.Parse("{}").RootElement.Clone();
 
@@ -274,30 +270,38 @@ public sealed class ProxyClientInvoker : IAocInvoker, IAsyncDisposable
     /// exit immediately. After this call, the proxy pipe server terminates and no
     /// further requests can be made through this connection.
     ///
-    /// Thread safety: This method bypasses _sendLock intentionally — it is only
-    /// called during shutdown, when concurrent callers should already have completed
-    /// or will fail harmlessly from the disposed pipe.
+    /// Thread safety: Acquires _sendLock to synchronize with any in-flight requests.
+    /// This avoids corrupting the pipe stream when a concurrent request is active.
+    /// The lock is released after the shutdown request completes, and the caller
+    /// should immediately invoke DisposeAsync to set _disposed and prevent reuse.
     /// </summary>
     public void SendShutdown()
     {
         if (_disposed || _baseStream is null) return;
 
         Debug.WriteLine("[IPC] Sending Shutdown...");
+
+        // Acquire lock to prevent concurrent pipe access with in-flight requests.
+        // Synchronous wait is acceptable here since the lock is held briefly.
+        _sendLock.Wait();
         try
         {
-            // Write directly (no lock) — we are shutting down.
             var request = """{"method":"Shutdown","params":[],"id":0}""" + "\n";
             var bytes = System.Text.Encoding.UTF8.GetBytes(request);
             _baseStream.Write(bytes);
             _baseStream.Flush();
 
             // Read response: {"jsonrpc":"2.0","result":"shutting down","id":0}
-            var responseBytes = ReadLine();
+            var responseBytes = ReadLineUnderLock();
             Debug.WriteLine($"[IPC] Shutdown response: {System.Text.Encoding.UTF8.GetString(responseBytes)}");
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[IPC] Shutdown error (non-fatal): {ex.Message}");
+        }
+        finally
+        {
+            _sendLock.Release();
         }
     }
 
@@ -410,7 +414,7 @@ public sealed class ProxyClientInvoker : IAocInvoker, IAsyncDisposable
             await _baseStream.FlushAsync().ConfigureAwait(false);
 
             // ── Read response ──
-            var responseBytes = await ReadLineAsync().ConfigureAwait(false);
+            var responseBytes = await ReadLineUnderLockAsync().ConfigureAwait(false);
             if (responseBytes.Length == 0)
             {
                 Debug.WriteLine("[IPC] << (empty — proxy disconnected)");
@@ -472,40 +476,45 @@ public sealed class ProxyClientInvoker : IAocInvoker, IAsyncDisposable
     }
 
     /// <summary>
-    /// Sync wrapper for ReadLineAsync. Used by SendShutdown (shutdown-only path).
+    /// Sync wrapper for ReadLineUnderLockAsync. Used by SendShutdown (shutdown-only path).
+    /// Must be called UNDER _sendLock.
     /// </summary>
-    private byte[] ReadLine()
-        => ReadLineAsync().GetAwaiter().GetResult();
+    private byte[] ReadLineUnderLock()
+        => ReadLineUnderLockAsync().GetAwaiter().GetResult();
 
     /// <summary>
     /// Reads a newline-terminated UTF-8 line from the pipe base stream
-    /// into a reusable growing buffer using chunked Stream.ReadAsync() calls.
-    /// Returns the byte array (excluding the newline), or empty on EOF.
+    /// using local (non-shared) buffers, then returns the byte array
+    /// (excluding the newline), or empty on EOF.
+    ///
+    /// Thread safety: Uses local MemoryStream and byte[] per call — no shared
+    /// instance state. The only shared resource is _baseStream, which must be
+    /// serialized by the caller (normally via _sendLock).
     /// </summary>
-    private async Task<byte[]> ReadLineAsync()
+    private async Task<byte[]> ReadLineUnderLockAsync()
     {
-        _readStream.SetLength(0);
-        _readStream.Position = 0;
+        using var readStream = new MemoryStream(4096);
+        var readChunk = new byte[1024];
 
         while (true)
         {
-            var bytesRead = await _baseStream!.ReadAsync(_readChunk, 0, _readChunk.Length)
+            var bytesRead = await _baseStream!.ReadAsync(readChunk, 0, readChunk.Length)
                 .ConfigureAwait(false);
             if (bytesRead == 0) break; // EOF
 
             for (var i = 0; i < bytesRead; i++)
             {
-                if (_readChunk[i] == (byte)'\n')
+                if (readChunk[i] == (byte)'\n')
                 {
                     // Line terminator found — write everything before it
                     if (i > 0)
-                        _readStream.Write(_readChunk, 0, i);
-                    return _readStream.GetBuffer().AsSpan(0, (int)_readStream.Length).ToArray();
+                        readStream.Write(readChunk, 0, i);
+                    return readStream.GetBuffer().AsSpan(0, (int)readStream.Length).ToArray();
                 }
             }
 
             // No newline in this chunk — accumulate and continue
-            _readStream.Write(_readChunk, 0, bytesRead);
+            readStream.Write(readChunk, 0, bytesRead);
         }
 
         return [];
@@ -516,11 +525,22 @@ public sealed class ProxyClientInvoker : IAocInvoker, IAsyncDisposable
         if (_disposed) return;
         _disposed = true;
 
+        // Acquire the lock to ensure no concurrent I/O is in-flight.
+        // Use a quick timeout to avoid deadlock if the lock is never released.
+        if (_sendLock.Wait(TimeSpan.FromSeconds(1)))
+        {
+            try
+            {
+                _jsonWriter?.Dispose();
+                _buffer?.Clear();
+                if (_baseStream is not null)
+                    await _baseStream.DisposeAsync();
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
+        }
         _sendLock.Dispose();
-        _jsonWriter?.Dispose();
-        _buffer?.Clear();
-        _readStream.Dispose();
-        if (_baseStream is not null)
-            await _baseStream.DisposeAsync();
     }
 }

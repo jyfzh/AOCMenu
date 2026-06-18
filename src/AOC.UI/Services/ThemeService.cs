@@ -1,14 +1,23 @@
+using System.IO;
+using System.Text.Json;
 using Microsoft.UI.Xaml;
-using Windows.Storage;
 
 namespace aoc.UI.Services;
 
 /// <summary>
 /// Manages app theme (Light / Dark / Follow System) with preference persistence.
+///
+/// Uses a JSON file in %LOCALAPPDATA%\AOC.UI for storage instead of
+/// Windows.Storage.ApplicationData, because ApplicationData.Current is not
+/// reliably available during early startup in unpackaged WinUI 3 apps.
 /// </summary>
 public sealed class ThemeService
 {
     private const string SettingsKey = "AppTheme";
+
+    private static readonly string StoragePath =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                     "AOC.UI", "theme.json");
 
     public static ThemeService Instance { get; } = new();
 
@@ -29,11 +38,20 @@ public sealed class ThemeService
     /// </summary>
     public void Initialize()
     {
-        if (ApplicationData.Current.LocalSettings.Values.TryGetValue(SettingsKey, out var saved)
-            && saved is string savedStr
-            && Enum.TryParse<ElementTheme>(savedStr, out var theme))
+        try
         {
-            CurrentTheme = theme;
+            var json = File.ReadAllText(StoragePath);
+            var data = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            if (data is not null
+                && data.TryGetValue(SettingsKey, out var saved)
+                && Enum.TryParse<ElementTheme>(saved, out var theme))
+            {
+                CurrentTheme = theme;
+            }
+        }
+        catch
+        {
+            // File doesn't exist or can't be read — use default theme.
         }
         ApplyCore(CurrentTheme);
     }
@@ -49,8 +67,28 @@ public sealed class ThemeService
         CurrentTheme = theme;
         ThemeChanging?.Invoke(theme);
 
-        // Persist
-        ApplicationData.Current.LocalSettings.Values[SettingsKey] = theme.ToString();
+        // Persist to JSON file
+        Save();
+    }
+
+    private void Save()
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(StoragePath);
+            if (dir is not null) Directory.CreateDirectory(dir);
+            var data = new Dictionary<string, string>
+            {
+                [SettingsKey] = CurrentTheme.ToString()
+            };
+            var json = JsonSerializer.Serialize(data);
+            File.WriteAllText(StoragePath, json);
+        }
+        catch
+        {
+            // Best-effort persistence; failing to save a theme preference
+            // is not worth crashing over.
+        }
     }
 
     /// <summary>
