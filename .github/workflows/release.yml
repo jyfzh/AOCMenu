@@ -48,17 +48,24 @@ jobs:
         shell: pwsh
         run: Get-ChildItem -Path src -Recurse -Directory -Filter obj | Remove-Item -Recurse -Force
 
-      # ── Step 3: Build all projects ────────────────────────────────
+      # ── Step 3: Build shared core (singleton) ────────────────────
+      # Build AOC.Core first — every other project depends on it.
+      # Building it alone avoids CSC file-lock contention on its
+      # intermediate DLL in the parallel solution build below.
+      - name: Build Core project
+        run: dotnet build src/AOC.Core/AOC.Core.csproj -c Release --self-contained true --disable-build-servers /p:UseSharedCompilation=false
+
+      # ── Step 4: Build remaining projects ──────────────────────────
       # Build first so tests can run; also ensures ZeasnProxy build
       # output is available for AOC's _CopyZeasnProxyOutput target.
-      - name: Build all projects
+      - name: Build remaining projects
         run: dotnet build -c Release --self-contained true --disable-build-servers /p:UseSharedCompilation=false
 
-      # ── Step 4: Run tests ──────────────────────────────────────────
+      # ── Step 5: Run tests ──────────────────────────────────────────
       - name: Run Tests
         run: dotnet test tests/aoc.Tests/aoc.Tests.csproj -c Release --logger trx
 
-      # ── Step 5: Publish projects ──────────────────────────────────
+      # ── Step 6: Publish projects ──────────────────────────────────
       # Publish produces the final deployment-ready output (includes
       # runtime for self-contained apps, native DLLs, etc.)
       - name: Publish UI
@@ -67,20 +74,20 @@ jobs:
       - name: Publish CLI
         run: dotnet publish src/AOC/AOC.csproj -c Release --self-contained true -r win-x64 --disable-build-servers /p:UseSharedCompilation=false
 
-      # ── Step 6: Pack UI binaries (from publish output) ───────────
+      # ── Step 7: Pack UI binaries (from publish output) ───────────
       - name: Pack UI binaries
         shell: pwsh
         run: |
           $uiPath = "$env:UI_PROJECT/bin/Release/$env:UI_TFM/$env:RID/publish"
           Compress-Archive -Path "$uiPath/*" -DestinationPath aoc-ui-x64.zip
 
-      # ── Step 7: Pack CLI binaries (from publish output) ──────────
+      # ── Step 8: Pack CLI binaries (from publish output) ──────────
       - name: Pack CLI binaries
         shell: pwsh
         run: |
           Compress-Archive -Path "src/AOC/bin/Release/$env:CLI_TFM/win-x64/publish/*" -DestinationPath aoc-cli-x64.zip
 
-      # ── Step 8: Create GitHub Release ─────────────────────────────
+      # ── Step 9: Create GitHub Release ─────────────────────────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
