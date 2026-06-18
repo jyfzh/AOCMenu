@@ -33,10 +33,6 @@ jobs:
       - name: Setup MSBuild.exe
         uses: microsoft/setup-msbuild@v1
 
-      # WinApp CLI for packaging: https://github.com/microsoft/setup-WinAppCli
-      - name: Setup WinApp CLI
-        uses: microsoft/setup-WinAppCli@v0.1
-
       # ── Step 1: Build all three projects in one command ───────────
       # ZeasnProxy (x86 via csproj), AOC (self-contained via csproj), AOC.UI (x64 via csproj)
       - name: Build all projects
@@ -46,30 +42,21 @@ jobs:
       - name: Run Tests
         run: dotnet test tests/aoc.Tests/aoc.Tests.csproj -c Release --logger trx
 
-      # ── Step 3: Decode certificate from secret ─────────────────────
-      - name: Decode the pfx
+      # ── Step 3: Pack UI binaries ───────────────────────────────────
+      - name: Pack UI binaries
         shell: pwsh
-        run: |
-          $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.BASE64_ENCODED_PFX }}")
-          $certificatePath = "GitHubActionsWorkflow.pfx"
-          [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
-
-      # ── Step 4: Create MSIX Package ────────────────────────────────
-      # Path includes RID because --self-contained true appends the RuntimeIdentifier
-      # to the output path: bin/Release/$(TFM)/$(RID)/
-      - name: Create MSIX Package
         run: |
           $tfm = "$env:TFM"
           $rid = "$env:RID"
-          winapp package `
-            "$env:UI_PROJECT/bin/Release/$tfm/$rid" `
-            --cert GitHubActionsWorkflow.pfx `
-            --manifest src/AOC.UI/Package.appxmanifest `
-            --output AOC.UI.msix
-
-      # ── Step 5: Remove the pfx ─────────────────────────────────────
-      - name: Remove the pfx
-        run: Remove-Item -path GitHubActionsWorkflow.pfx
+          $uiPath = "$env:UI_PROJECT/bin/Release/$tfm/$rid"
+          Compress-Archive -Path "$uiPath/*" -DestinationPath aoc-ui-x64.zip
+      - name: Pack UI binaries
+        shell: pwsh
+        run: |
+          $tfm = "$env:TFM"
+          $rid = "$env:RID"
+          $uiPath = "$env:UI_PROJECT/bin/Release/$tfm/$rid"
+          Compress-Archive -Path "$uiPath/*" -DestinationPath aoc-ui-x64.zip
 
       # ── Step 6: Pack CLI binaries ──────────────────────────────────
       - name: Pack CLI binaries
@@ -83,6 +70,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            AOC.UI.msix
+            aoc-ui-x64.zip
             aoc-cli-x64.zip
           generate_release_notes: true
