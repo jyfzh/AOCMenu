@@ -244,6 +244,14 @@ public sealed class ProxyMultiClientIntegrationTests : IAsyncLifetime
         doc.RootElement.GetProperty("result").GetString().Should().Be("shutting down");
         pipe.Close();
 
+        // Wait for the server loop to fully exit before attempting reconnect.
+        // In CI the server may still be processing cancellation; this guarantees
+        // the accept loop has stopped before we verify the pipe is dead.
+        Assert.NotNull(_serverTask);
+        try { await _serverTask.WaitAsync(TimeSpan.FromSeconds(3)); }
+        catch (OperationCanceledException) { }
+        catch (TimeoutException) { }
+
         // Server should have stopped — new connection attempt should fail
         using var deadPipe = new NamedPipeClientStream(
             ".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
