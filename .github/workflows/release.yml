@@ -55,7 +55,7 @@ jobs:
       # Publish produces the final deployment-ready output (includes
       # runtime for self-contained apps, native DLLs, etc.)
       - name: Publish UI
-        run: dotnet publish src/AOC.UI/AOC.UI.csproj -c Release --disable-build-servers
+        run: dotnet publish src/AOC.UI/AOC.UI.csproj -c Release --self-contained true -r win-x64 --disable-build-servers
 
       - name: Publish CLI
         run: dotnet publish src/AOC/AOC.csproj -c Release --self-contained true -r win-x64 --disable-build-servers
