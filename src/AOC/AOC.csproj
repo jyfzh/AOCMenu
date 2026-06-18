@@ -13,21 +13,20 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AOC.Core\AOC.Core.csproj" />
-    <ProjectReference Include="..\ZeasnProxy\ZeasnProxy.csproj">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </ProjectReference>
   </ItemGroup>
 
-  <Target Name="_CopyZeasnProxyOutput" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+  <Target Name="_CopyZeasnProxyOutput" AfterTargets="Build;Publish" Condition="'$(TargetFramework)' != ''">
     <ItemGroup>
-      <_ZeasnProxyFiles Include="..\ZeasnProxy\bin\$(Configuration)\net10.0\ZeasnProxy.*" />
-      <_ZeasnProxySdkFiles Include="..\ZeasnProxy\bin\$(Configuration)\net10.0\sdk\**\*" />
+      <_ZeasnProxyAllFiles Include="..\ZeasnProxy\bin\$(Configuration)\net10.0\win-x86\**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(_ZeasnProxyFiles)" DestinationFolder="$(OutputPath)"
-          SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(_ZeasnProxySdkFiles)" DestinationFolder="$(OutputPath)\sdk\"
-          SkipUnchangedFiles="true" />
+    <!-- Build → OutputPath; Publish → PublishDir -->
+    <Copy SourceFiles="@(_ZeasnProxyAllFiles)"
+          DestinationFiles="@(_ZeasnProxyAllFiles -> '$([MSBuild]::NormalizeDirectory($(OutputPath)))x86\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'$(OutputPath)' != ''" />
+    <Copy SourceFiles="@(_ZeasnProxyAllFiles)"
+          DestinationFiles="@(_ZeasnProxyAllFiles -> '$([MSBuild]::NormalizeDirectory($(PublishDir)))x86\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'$(PublishDir)' != ''" />
   </Target>
 </Project>

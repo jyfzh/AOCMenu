@@ -47,20 +47,51 @@
   </ItemGroup>
 
 
-  <Target Name="_CopyZeasnProxyOutput" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+  <!--
+    Copy ZeasnProxy (x86 self-contained) into a x86\ subfolder to avoid
+    native runtime DLL conflicts with the x64 host (coreclr.dll, hostfxr.dll, etc.).
+    The ResolveProxyPath method in ProxyHost.cs checks this subfolder as fallback.
+    Runs after both Build and Publish to support both workflows.
+  -->
+  <Target Name="_CopyZeasnProxyOutput" AfterTargets="Build;Publish" Condition="'$(TargetFramework)' != ''">
     <ItemGroup>
-      <_ZeasnProxyFiles Include="..\ZeasnProxy\bin\$(Configuration)\net10.0\ZeasnProxy.*" />
-      <_ZeasnProxySdkFiles Include="..\ZeasnProxy\bin\$(Configuration)\net10.0\sdk\**\*" />
+      <_ZeasnProxyAllFiles Include="..\ZeasnProxy\bin\$(Configuration)\net10.0\win-x86\**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(_ZeasnProxyFiles)" DestinationFolder="$(OutputPath)"
-          SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(_ZeasnProxySdkFiles)" DestinationFolder="$(OutputPath)\sdk\"
-          SkipUnchangedFiles="true" />
+    <!-- Build → OutputPath; Publish → PublishDir -->
+    <Copy SourceFiles="@(_ZeasnProxyAllFiles)"
+          DestinationFiles="@(_ZeasnProxyAllFiles -> '$([MSBuild]::NormalizeDirectory($(OutputPath)))x86\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'$(OutputPath)' != ''" />
+    <Copy SourceFiles="@(_ZeasnProxyAllFiles)"
+          DestinationFiles="@(_ZeasnProxyAllFiles -> '$([MSBuild]::NormalizeDirectory($(PublishDir)))x86\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'$(PublishDir)' != ''" />
   </Target>
 
   <!--
     NOTE: Packaging is now handled in CI by distributing the built AOC.UI output as a ZIP.
   -->
+
+  <!--
+    Copy the PRI resource index and Assets folder into publish output.
+    WinUI 3 apps fail at startup with XamlParseException when the .pri
+    file is missing (the XAML framework cannot resolve resource URIs),
+    and the window/title-bar icons stop working when Assets\AppIcon.ico
+    is absent.
+    See https://github.com/microsoft/microsoft-ui-xaml/issues/9007
+  -->
+  <Target Name="_CopyPublishExtras" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
+    <ItemGroup>
+      <_PriFile Include="$(OutputPath)$(AssemblyName).pri" />
+      <_AssetsFiles Include="$(OutputPath)Assets\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PriFile)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_AssetsFiles)"
+          DestinationFiles="@(_AssetsFiles -> '$(PublishDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 
   <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>

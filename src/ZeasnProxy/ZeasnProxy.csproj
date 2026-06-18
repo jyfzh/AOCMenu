@@ -6,6 +6,8 @@
     <PlatformTarget>x86</PlatformTarget>
     <AssemblyName>ZeasnProxy</AssemblyName>
     <RootNamespace>ZeasnProxy</RootNamespace>
+    <SelfContained>true</SelfContained>
+    <PublishDir>bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\publish\</PublishDir>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AOC.Core\AOC.Core.csproj" />

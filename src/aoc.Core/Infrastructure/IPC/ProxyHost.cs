@@ -106,50 +106,25 @@ public sealed class ProxyHost : IAsyncDisposable
 
     /// <summary>
     /// Resolves the path to ZeasnProxy.exe.
-    /// ZeasnProxy is an x86 (32-bit) process. When the host UI is x64,
-    /// the MSIX layout places x64 hostfxr.dll alongside ZeasnProxy.exe,
-    /// causing architecture mismatch. This method resolves the proxy from
-    /// the source tree build output where it has its own x86 runtime.
+    /// First checks the host app directory (for simple colocated deployment).
+    /// Falls back to the x86\ subfolder where the build target
+    /// _CopyZeasnProxyOutput in AOC.UI.csproj places the self-contained x86
+    /// runtime files, avoiding native DLL name conflicts with the x64 host.
     /// </summary>
     private static string ResolveProxyPath()
     {
-        // 1. Check AppContext.BaseDirectory (works for unpackaged / direct runs).
+        // 1. Check next to the host app (packaged deployment or manual copy).
         var basePath = Path.Combine(AppContext.BaseDirectory, "ZeasnProxy.exe");
         if (File.Exists(basePath))
-        {
-            // If there's no hostfxr.dll conflict, this path is safe.
-            var hostfxr = Path.Combine(AppContext.BaseDirectory, "hostfxr.dll");
-            if (!File.Exists(hostfxr))
-                return basePath;
-        }
+            return basePath;
 
-        // 2. Fallback: search parent directories for the repo root (has .git).
-        var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
-        if (repoRoot is not null)
-        {
-            var sourcePath = Path.Combine(repoRoot, "src", "ZeasnProxy", "bin",
-                "Debug", "net10.0", "ZeasnProxy.exe");
-            if (File.Exists(sourcePath))
-                return sourcePath;
-        }
+        // 2. Fallback: x86\ subfolder (self-contained runtime, no architecture conflict).
+        var subPath = Path.Combine(AppContext.BaseDirectory, "x86", "ZeasnProxy.exe");
+        if (File.Exists(subPath))
+            return subPath;
 
-        // 3. Return the base path and let the caller handle the error.
+        // 3. Return basePath and let the caller handle the error.
         return basePath;
-    }
-
-    /// <summary>
-    /// Walks up from the given directory looking for a .git directory (repo root).
-    /// </summary>
-    private static string? FindRepoRoot(string startDir)
-    {
-        var dir = new DirectoryInfo(startDir);
-        for (var i = 0; i < 10 && dir is not null; i++)
-        {
-            if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
-                return dir.FullName;
-            dir = dir.Parent;
-        }
-        return null;
     }
 
     public async ValueTask DisposeAsync()

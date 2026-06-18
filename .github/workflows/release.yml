@@ -15,8 +15,6 @@ jobs:
 
     env:
       Solution_Name: AOCMonitor.slnx
-      # Target framework for build output paths (must match AOC.UI.csproj)
-      TFM: net10.0-windows10.0.26100.0
       RID: win-x64
       UI_PROJECT: src/AOC.UI
 
@@ -33,36 +31,47 @@ jobs:
       - name: Setup MSBuild.exe
         uses: microsoft/setup-msbuild@v1
 
-      # ── Step 1: Build all three projects in one command ───────────
-      # ZeasnProxy (x86 via csproj), AOC (self-contained via csproj), AOC.UI (x64 via csproj)
+      # ── Step 1: Resolve TFMs from project files ───────────────────
+      # Reads TargetFramework from each csproj so pack paths stay in sync
+      - name: Resolve TFMs
+        shell: pwsh
+        run: |
+          $uiTfm = [regex]::Match((Get-Content src/AOC.UI/AOC.UI.csproj -Raw), '<TargetFramework>(.*?)</TargetFramework>').Groups[1].Value
+          $cliTfm = [regex]::Match((Get-Content src/AOC/AOC.csproj -Raw), '<TargetFramework>(.*?)</TargetFramework>').Groups[1].Value
+          echo "UI_TFM=$uiTfm" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "CLI_TFM=$cliTfm" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      # ── Step 2: Build all projects ────────────────────────────────
+      # Build first so tests can run; also ensures ZeasnProxy build
+      # output is available for AOC's _CopyZeasnProxyOutput target.
       - name: Build all projects
         run: dotnet build -c Release --self-contained true --disable-build-servers
 
-      # ── Step 2: Run tests ──────────────────────────────────────────
+      # ── Step 3: Run tests ──────────────────────────────────────────
       - name: Run Tests
         run: dotnet test tests/aoc.Tests/aoc.Tests.csproj -c Release --logger trx
 
-      # ── Step 3: Pack UI binaries ───────────────────────────────────
+      # ── Step 4: Publish projects ──────────────────────────────────
+      # Publish produces the final deployment-ready output (includes
+      # runtime for self-contained apps, native DLLs, etc.)
+      - name: Publish UI
+        run: dotnet publish src/AOC.UI/AOC.UI.csproj -c Release --disable-build-servers
+
+      - name: Publish CLI
+        run: dotnet publish src/AOC/AOC.csproj -c Release --self-contained true -r win-x64 --disable-build-servers
+
+      # ── Step 5: Pack UI binaries (from publish output) ───────────
       - name: Pack UI binaries
         shell: pwsh
         run: |
-          $tfm = "$env:TFM"
-          $rid = "$env:RID"
-          $uiPath = "$env:UI_PROJECT/bin/Release/$tfm/$rid"
-          Compress-Archive -Path "$uiPath/*" -DestinationPath aoc-ui-x64.zip
-      - name: Pack UI binaries
-        shell: pwsh
-        run: |
-          $tfm = "$env:TFM"
-          $rid = "$env:RID"
-          $uiPath = "$env:UI_PROJECT/bin/Release/$tfm/$rid"
+          $uiPath = "$env:UI_PROJECT/bin/Release/$env:UI_TFM/$env:RID/publish"
           Compress-Archive -Path "$uiPath/*" -DestinationPath aoc-ui-x64.zip
 
-      # ── Step 6: Pack CLI binaries ──────────────────────────────────
+      # ── Step 6: Pack CLI binaries (from publish output) ──────────
       - name: Pack CLI binaries
         shell: pwsh
         run: |
-          Compress-Archive -Path src/AOC/bin/Release/net10.0/* -DestinationPath aoc-cli-x64.zip
+          Compress-Archive -Path "src/AOC/bin/Release/$env:CLI_TFM/win-x64/publish/*" -DestinationPath aoc-cli-x64.zip
 
       # ── Step 7: Create GitHub Release ─────────────────────────────
       - name: Create GitHub Release
