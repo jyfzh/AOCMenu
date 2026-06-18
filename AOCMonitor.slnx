@@ -6,6 +6,6 @@
     <Project Path="src/AOC.UI/AOC.UI.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/aoc.Tests/aoc.Tests.csproj" />
+    <Project Path="tests/AOC.Tests/AOC.Tests.csproj" />
   </Folder>
 </Solution>
